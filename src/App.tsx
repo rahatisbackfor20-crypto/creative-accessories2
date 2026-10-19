@@ -23,7 +23,6 @@ import {
   ProductRequestStatus
 } from './types';
 import { 
-  MASTER_ADMIN_PASS, 
   DEFAULT_FIREBASE_URL, 
   INITIAL_COMPANY_PROFILE, 
   INITIAL_SECTIONS, 
@@ -42,14 +41,7 @@ import {
   normalizeFirebaseUrl 
 } from './storage';
 import { X } from 'lucide-react';
-import { 
-  validateAndRestoreSession, 
-  saveAuthSession, 
-  clearAuthSession, 
-  revalidateActiveUser, 
-  SESSION_USER_ID_KEY, 
-  ACTIVE_USER_KEY 
-} from './authPersistence';
+
 import { Navbar } from './components/Navbar';
 import { StatusStrip } from './components/StatusStrip';
 import { DashboardView } from './components/DashboardView';
@@ -61,9 +53,9 @@ import { LeaveView } from './components/LeaveView';
 import { BillsExpensesView } from './components/BillsExpensesView';
 import { ProductRequestView } from './components/ProductRequestView';
 import { AdminPanelView } from './components/AdminPanelView';
-import { LoginView } from './components/LoginView';
+
 import { DigitalIdCardModal } from './components/DigitalIdCardModal';
-import { AdminGateModal } from './components/AdminGateModal';
+
 import { UserProfileModal } from './components/UserProfileModal';
 import { PrintReportModal } from './components/PrintReportModal';
 import { GlobalSearchModal } from './components/GlobalSearchModal';
@@ -71,7 +63,7 @@ import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { BangladeshHolidayCalendar } from './components/BangladeshHolidayCalendar';
 import { getNextUpcomingHoliday } from './data/bangladeshHolidays';
 
-export default function App() {
+export default function App({ identityUser, onIdentityLogout }: { identityUser: User; onIdentityLogout: () => Promise<void> }) {
   // Theme & Language
   const [darkMode, setDarkMode] = useState<boolean>(() => {
     return localStorage.getItem('caf_theme') === 'dark';
@@ -120,12 +112,7 @@ export default function App() {
       const saved = localStorage.getItem('caf_users');
       if (saved) {
         const parsed: User[] = JSON.parse(saved);
-        return parsed.map(u => {
-          if (u.accountType === 'hosting' && (u.username === 'Robiulawal0209@' || u.password === 'Robiulawal0209@')) {
-            return { ...u, username: 'admin', password: MASTER_ADMIN_PASS };
-          }
-          return u;
-        });
+        return parsed;
       }
       return INITIAL_USERS;
     } catch {
@@ -253,17 +240,24 @@ export default function App() {
     return new Date().toISOString().substring(0, 7);
   });
 
-  // Active Session & View State: Strictly validate existing 'caf_session_user_id' and 'caf_active_user' tokens
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    return validateAndRestoreSession();
-  });
+  // Identity controls authentication and permissions; directory records provide profile details only.
+  const [profileUser, setCurrentUser] = useState<User | null>(identityUser);
+  const currentUser: User = {
+    ...(profileUser || identityUser),
+    id: identityUser.id,
+    username: identityUser.username,
+    accountType: identityUser.accountType,
+    adminAccess: identityUser.adminAccess,
+    accountStatus: identityUser.accountStatus,
+    password: undefined,
+  };
 
   const [currentTab, setCurrentTab] = useState<TabType>('dashboard');
-  const [isAdminUnlocked, setIsAdminUnlocked] = useState(false);
+
 
   // Modals
   const [idCardModalUser, setIdCardModalUser] = useState<User | null>(null);
-  const [adminGateModalOpen, setAdminGateModalOpen] = useState(false);
+
   const [userProfileModalOpen, setUserProfileModalOpen] = useState(false);
   const [printModalOpen, setPrintModalOpen] = useState(false);
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
@@ -349,36 +343,6 @@ export default function App() {
     localStorage.setItem('caf_duty_settings', JSON.stringify(dutySettings));
   }, [dutySettings]);
 
-  // Strictly persist or clear session state whenever currentUser changes
-  useEffect(() => {
-    if (currentUser) {
-      saveAuthSession(currentUser);
-    } else {
-      clearAuthSession();
-    }
-  }, [currentUser]);
-
-  // Cross-tab synchronization of authentication session
-  useEffect(() => {
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === SESSION_USER_ID_KEY || e.key === ACTIVE_USER_KEY) {
-        if (!e.newValue) {
-          // Explicit logout in another tab
-          setCurrentUser(null);
-          setIsAdminUnlocked(false);
-        } else {
-          // New login or updated session in another tab
-          const validated = validateAndRestoreSession(users);
-          if (validated) {
-            setCurrentUser(validated);
-          }
-        }
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, [users]);
-
   // Global Keyboard Shortcuts (Ctrl+K for Search, ? for Shortcuts)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -405,7 +369,7 @@ export default function App() {
   const lastSnap = useRef('');
 
   // Access checks
-  const isFullAdmin = isAdminUnlocked || currentUser?.accountType === 'hosting' || currentUser?.accountType === 'admin' || currentUser?.adminAccess === 'full';
+  const isFullAdmin = identityUser.accountType === 'admin';
   const canAccessPayroll = currentUser?.accountType !== 'employee' || isFullAdmin || currentUser?.adminAccess === 'basic' || currentUser?.adminAccess === 'full';
 
   useEffect(() => {
@@ -517,7 +481,7 @@ export default function App() {
         if (data.companyProfile) setCompanyProfile(data.companyProfile);
         if (Array.isArray(data.users)) {
           setUsers(data.users);
-          setCurrentUser(prev => prev ? revalidateActiveUser(prev, data.users) : null);
+          setCurrentUser(prev => { const profile = data.users.find((u: User) => u.id === identityUser.id); return profile ? { ...profile, password: undefined } : prev; });
         }
         if (Array.isArray(data.attendance)) setAttendance(data.attendance);
         if (Array.isArray(data.overtime)) setOvertime(data.overtime);
@@ -587,7 +551,7 @@ export default function App() {
         if (data.companyProfile) setCompanyProfile(data.companyProfile);
         if (Array.isArray(data.users)) {
           setUsers(data.users);
-          setCurrentUser(prev => prev ? revalidateActiveUser(prev, data.users) : null);
+          setCurrentUser(prev => { const profile = data.users.find((u: User) => u.id === identityUser.id); return profile ? { ...profile, password: undefined } : prev; });
         }
         if (Array.isArray(data.attendance)) setAttendance(data.attendance);
         if (Array.isArray(data.overtime)) setOvertime(data.overtime);
@@ -612,75 +576,8 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Authentication Handlers
-  const handleLogin = async (username: string, pass: string): Promise<{ success: boolean; error?: string }> => {
-    const trimmedUser = username.trim();
-    const trimmedPass = pass.trim();
-
-    // Check master admin password
-    if ((trimmedUser === MASTER_ADMIN_PASS || trimmedUser.toLowerCase() === 'admin') && trimmedPass === MASTER_ADMIN_PASS) {
-      const hostingUser = users.find(u => u.accountType === 'hosting') || users[0];
-      if (hostingUser.accountStatus && hostingUser.accountStatus !== 'Active') {
-        return { 
-          success: false, 
-          error: language === 'bn' ? 'এই অ্যাকাউন্টটি বর্তমানে নিষ্ক্রিয় রয়েছে।' : 'This account is currently inactive' 
-        };
-      }
-      setCurrentUser(hostingUser);
-      saveAuthSession(hostingUser);
-      setIsAdminUnlocked(true);
-      setCurrentTab('dashboard');
-      return { success: true };
-    }
-
-    // Live verification
-    let latestUsers = users;
-    if (cloudDbUrl) {
-      const cloudData = await fetchFromCloud(cloudDbUrl);
-      if (cloudData && Array.isArray(cloudData.users)) {
-        latestUsers = cloudData.users;
-      }
-    }
-
-    const matched = latestUsers.find(
-      u => u.username && u.username.toLowerCase() === trimmedUser.toLowerCase() && String(u.password || '') === trimmedPass
-    );
-
-    if (!matched) {
-      return { 
-        success: false, 
-        error: language === 'bn' ? 'ভুল ইউজারনেম বা পাসওয়ার্ড।' : 'Invalid username or password' 
-      };
-    }
-
-    if (matched.accountStatus === 'Pending') {
-      return { 
-        success: false, 
-        error: language === 'bn'
-          ? 'আপনার অ্যাকাউন্টটি তৈরি হয়েছে এবং এটি বর্তমানে অ্যাডমিন অনুমোদনের অপেক্ষায় (Pending Approval) রয়েছে। অ্যাডমিন অনুমোদন দিলে লগইন করতে পারবেন।'
-          : 'Your account is pending admin approval. You can log in once approved by an admin.' 
-      };
-    }
-
-    if (matched.accountStatus !== 'Active') {
-      return { 
-        success: false, 
-        error: language === 'bn' ? 'এই অ্যাকাউন্টটি বর্তমানে নিষ্ক্রিয় রয়েছে।' : 'This account is currently inactive' 
-      };
-    }
-
-    setCurrentUser(matched);
-    saveAuthSession(matched);
-    setIsAdminUnlocked(matched.accountType === 'hosting' && trimmedPass === MASTER_ADMIN_PASS);
-    setCurrentTab('dashboard');
-    return { success: true };
-  };
-
   const handleLogout = () => {
-    clearAuthSession();
-    setCurrentUser(null);
-    setIsAdminUnlocked(false);
-    setCurrentTab('dashboard');
+    void onIdentityLogout();
   };
 
   // Operational Action Handlers
@@ -1045,7 +942,7 @@ export default function App() {
         handleLogout();
       } else {
         setCurrentUser(user);
-        saveAuthSession(user);
+
       }
     }
   };
@@ -1141,40 +1038,6 @@ export default function App() {
     await fetchFromCloud(url);
   };
 
-  // If no user is logged in, show Login / Register View
-  if (!currentUser) {
-    return (
-      <div className={`min-h-screen ${darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-50 text-slate-900'}`}>
-        <LoginView
-          companyProfile={companyProfile}
-          sections={sections}
-          language={language}
-          darkMode={darkMode}
-          onLogin={handleLogin}
-          onRegisterUser={handleRegisterUser}
-          onToggleLanguage={() => setLanguage(l => l === 'en' ? 'bn' : 'en')}
-          onToggleDarkMode={() => setDarkMode(!darkMode)}
-          onOpenAdminGate={() => setAdminGateModalOpen(true)}
-        />
-
-        <AdminGateModal
-          isOpen={adminGateModalOpen}
-          onClose={() => setAdminGateModalOpen(false)}
-          onSuccess={() => {
-            setIsAdminUnlocked(true);
-            setAdminGateModalOpen(false);
-            const hostingUser = users.find(u => u.accountType === 'hosting') || users[0];
-            setCurrentUser(hostingUser);
-            saveAuthSession(hostingUser);
-            setCurrentTab('admin_panel');
-          }}
-          language={language}
-          darkMode={darkMode}
-        />
-      </div>
-    );
-  }
-
   return (
     <div className={`min-h-screen flex flex-col transition-colors ${
       darkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-[#f8fafc] text-slate-800'
@@ -1185,8 +1048,8 @@ export default function App() {
         onSelectTab={setCurrentTab}
         currentUser={currentUser}
         onLogout={handleLogout}
-        onOpenAdminGate={() => setAdminGateModalOpen(true)}
-        isAdminUnlocked={isAdminUnlocked}
+        onOpenAdminGate={() => { if (isFullAdmin) setCurrentTab('admin_panel'); }}
+        isAdminUnlocked={isFullAdmin}
         language={language}
         onToggleLanguage={() => setLanguage(l => l === 'en' ? 'bn' : 'en')}
         darkMode={darkMode}
@@ -1412,7 +1275,7 @@ export default function App() {
         )}
 
         {/* 9. Admin Panel View */}
-        {currentTab === 'admin_panel' && currentUser && (
+        {currentTab === 'admin_panel' && isFullAdmin && (
           <AdminPanelView
             users={users}
             currentUser={currentUser}
@@ -1503,22 +1366,6 @@ export default function App() {
         companyProfile={companyProfile}
         language={language}
         onClose={() => setIdCardModalUser(null)}
-      />
-
-      <AdminGateModal
-        isOpen={adminGateModalOpen}
-        onClose={() => setAdminGateModalOpen(false)}
-        onSuccess={() => {
-          setIsAdminUnlocked(true);
-          setAdminGateModalOpen(false);
-          if (!currentUser) {
-            const hostingUser = users.find(u => u.accountType === 'hosting') || users[0];
-            setCurrentUser(hostingUser);
-          }
-          setCurrentTab('admin_panel');
-        }}
-        language={language}
-        darkMode={darkMode}
       />
 
       <PrintReportModal
