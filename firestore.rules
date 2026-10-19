@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow read/write for factory users and portal syncing
+    match /company/{document=**} {
+      allow read, write: if true;
+    }
+
+    match /users/{userId} {
+      allow read, write: if true;
+    }
+
+    match /attendance/{recordId} {
+      allow read, write: if true;
+    }
+
+    match /overtime/{recordId} {
+      allow read, write: if true;
+    }
+
+    match /productions/{recordId} {
+      allow read, write: if true;
+    }
+
+    match /payroll/{month} {
+      allow read, write: if true;
+    }
+
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}

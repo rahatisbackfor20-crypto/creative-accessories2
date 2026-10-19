@@ -1,0 +1,140 @@
+{
+  "entities": {
+    "CompanyProfile": {
+      "title": "Company Profile",
+      "description": "Factory company profile, notice board, and official details",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "contactNumber": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "factoryRegNo": { "type": "string" },
+        "establishedYear": { "type": "string" },
+        "noticeTitle": { "type": "string" },
+        "noticeText": { "type": "string" },
+        "noticeDate": { "type": "string" },
+        "mapEmbedUrl": { "type": "string" }
+      },
+      "required": ["name", "factoryRegNo"]
+    },
+    "User": {
+      "title": "User",
+      "description": "Factory employee, staff, MD, or administrator profile",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fullName": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "pendingPhotoUrl": { "type": "string" },
+        "accountType": { "type": "string", "enum": ["hosting", "md", "admin", "staff", "employee"] },
+        "adminAccess": { "type": "string", "enum": ["none", "basic", "full"] },
+        "designation": { "type": "string" },
+        "section": { "type": "string" },
+        "department": { "type": "string" },
+        "username": { "type": "string" },
+        "password": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "joiningDate": { "type": "string" },
+        "whatsapp": { "type": "string" },
+        "accountStatus": { "type": "string", "enum": ["Active", "Inactive", "Pending"] },
+        "basicSalary": { "type": "number" },
+        "hourlyRate": { "type": "number" }
+      },
+      "required": ["id", "fullName", "accountType", "username", "employeeId"]
+    },
+    "AttendanceRecord": {
+      "title": "Attendance Record",
+      "description": "Daily employee attendance check-in and check-out logs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string", "enum": ["Present", "Late", "Absent"] },
+        "inTime": { "type": "string" },
+        "outTime": { "type": "string" },
+        "shift": { "type": "string" }
+      },
+      "required": ["id", "userId", "date", "status"]
+    },
+    "OvertimeRecord": {
+      "title": "Overtime Record",
+      "description": "Factory overtime hours, approval status, and justification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "date": { "type": "string" },
+        "hours": { "type": "number" },
+        "section": { "type": "string" },
+        "reason": { "type": "string" },
+        "status": { "type": "string", "enum": ["Approved", "Pending", "Rejected"] },
+        "approvedBy": { "type": "string" }
+      },
+      "required": ["id", "userId", "date", "hours", "status"]
+    },
+    "ProductionRecord": {
+      "title": "Production Record",
+      "description": "Factory production order and daily output entries",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "date": { "type": "string" },
+        "orderDate": { "type": "string" },
+        "deliveryDate": { "type": "string" },
+        "section": { "type": "string" },
+        "itemName": { "type": "string" },
+        "buyer": { "type": "string" },
+        "company": { "type": "string" },
+        "length": { "type": "string" },
+        "productType": { "type": "string" },
+        "orderQty": { "type": "number" },
+        "prodQty": { "type": "number" },
+        "unit": { "type": "string" },
+        "unitPrice": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["Completed", "Running", "Delayed"] }
+      },
+      "required": ["id", "itemName", "orderQty", "status"]
+    },
+    "PayrollState": {
+      "title": "Payroll State",
+      "description": "Monthly payment status map for employees",
+      "type": "object",
+      "properties": {
+        "month": { "type": "string" },
+        "statusMap": { "type": "string" }
+      },
+      "required": ["month"]
+    }
+  },
+  "firestore": {
+    "/company/profile": {
+      "schema": "CompanyProfile",
+      "description": "Official company profile, notices, and map location"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Factory staff and worker profiles with access levels"
+    },
+    "/attendance/{recordId}": {
+      "schema": "AttendanceRecord",
+      "description": "Daily attendance entries"
+    },
+    "/overtime/{recordId}": {
+      "schema": "OvertimeRecord",
+      "description": "Daily overtime records"
+    },
+    "/productions/{recordId}": {
+      "schema": "ProductionRecord",
+      "description": "Factory production tracking and buyer orders"
+    },
+    "/payroll/{month}": {
+      "schema": "PayrollState",
+      "description": "Monthly payroll payment statuses"
+    }
+  }
+}

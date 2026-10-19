@@ -1,0 +1,6 @@
+{
+  "name": "Creative Accessories Factory Portal",
+  "description": "Live cloud-synced factory production, worker tracking, attendance, overtime, payroll, and digital ID portal with bilingual English and Bengali support.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
